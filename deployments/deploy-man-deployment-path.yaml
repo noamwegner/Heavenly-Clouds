@@ -1,0 +1,31 @@
+tosca_definitions_version: tosca_simple_yaml_1_0
+
+metadata:
+  template_name: HeavenlyCloudsShell
+  template_author: Anonymous
+  template_version: 0.1.0
+  template_icon: deploy-man.png
+
+description: >
+  deploy-man deployment path file
+
+imports:
+  - cloudshell_standard: cloudshell_cloud_provider_standard_1_0_0.yaml
+
+node_types:      
+  vendor.resource.HeavenlyCloudsManDeployment:
+    derived_from: cloudshell.nodes.CustomDeploymentOption
+    properties:        
+      weight:        
+        type: float
+        tags: [user_input]
+      height:  
+        type: float
+        tags: [user_input]   
+      cloud_name:
+        type: string
+        default: white      
+    artifacts:
+      icon:
+        file: deploy-man.png
+        type: tosca.artifacts.File
