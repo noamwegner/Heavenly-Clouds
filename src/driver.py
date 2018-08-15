@@ -5,18 +5,15 @@ from cloudshell.shell.core.driver_context import InitCommandContext, AutoLoadCom
     AutoLoadAttribute, AutoLoadDetails, CancellationContext, ResourceRemoteCommandContext
 
 from cloudshell.core.logger import qs_logger
-#from data_model import *  # run 'shellfoundry generate' to generate data model classes
-
-
-
-from data_model import  *
-import json
-
+# from data_model import *  # run 'shellfoundry generate' to generate data model classes
+from data_model import *
 from heavenly_clouds_service import HeavenlyCloudsService
 from heavenly_clouds_service_wrapper import HeavenlyCloudsServiceWrapper
 
+import json
 
-class HeavenlyCloudsShellDriver (ResourceDriverInterface):
+
+class HeavenlyCloudsShellDriver(ResourceDriverInterface):
 
     def __init__(self):
         """
@@ -47,7 +44,6 @@ class HeavenlyCloudsShellDriver (ResourceDriverInterface):
         self.deployments[DeployAngelModel.__deploymentModel__] = HeavenlyCloudsServiceWrapper.deploy_angel
         self.deployments[DeployManModel.__deploymentModel__] = HeavenlyCloudsServiceWrapper.deploy_man
 
-
     # <editor-fold desc="Discovery">
 
     def get_inventory(self, context):
@@ -58,12 +54,7 @@ class HeavenlyCloudsShellDriver (ResourceDriverInterface):
         # read from context
         resource = HeavenlyCloudsShell.create_from_context(context)
 
-
-        context_json =  json.dumps(context, default=lambda o: o.__dict__,
-             sort_keys=True, indent=4)
-
-        self.logger.error('context_json')
-        self.logger.error(context_json)
+        self._log_value('get_inventory_context_json', context)
 
         # validating
         if resource.name == 'evil':
@@ -73,7 +64,8 @@ class HeavenlyCloudsShellDriver (ResourceDriverInterface):
             raise ValueError('invalid region, sorry ca\'nt deploy instances on the sun')
 
         # using your cloud provider sdk
-        if not HeavenlyCloudsService.can_connect(resource.user, resource.password, context.resource.address):
+        if not HeavenlyCloudsService.can_connect(resource.user, resource.password,
+                                                 context.resource.address):  # TODO add address to resource (gal shellfoundry team)
             raise ValueError('could not connect using given credentials')
 
         # discovering - using your prefered custom cloud service you can discover and then update values
@@ -86,6 +78,39 @@ class HeavenlyCloudsShellDriver (ResourceDriverInterface):
 
     # <editor-fold desc="Mandatory Commands">
 
+    def Deploy(self, context, request=None, cancellation_context=None):
+        """
+       Deploy
+       :param ResourceCommandContext context:
+       :param str request: A JSON string with the list of requested deployment actions
+       :param CancellationContext cancellation_context:
+       :return:
+       :rtype: str
+       """
+
+        self._log_value('deploy_request', request)
+        self._log_value('deploy_context', context)
+
+        # parse the json strings into action objects
+        cloud_provider_resource = HeavenlyCloudsShell.create_from_context(context)
+        actions = self.request_parser.convert_driver_request_to_actions(request)
+
+        # extract DeployApp action
+        deploy_action = single(actions, lambda x: isinstance(x, DeployApp))
+
+        # if we have multiple supported deployment options use the 'deploymentPath' property
+        # to decide which deployment option to use.
+        deployment_name = deploy_action.actionParams.deployment.deploymentPath
+
+        self._log_value('deployment_name', deployment_name)
+
+        _my_deploy_method = self.deployments[deployment_name]
+        deploy_result = _my_deploy_method(cloud_provider_resource, deploy_action, cancellation_context, self.logger)
+
+        self._log_value('deploy_result', deploy_result)
+
+        return DriverResponse([deploy_result]).to_driver_response_json()
+
     # def Deploy(self, context, request=None, cancellation_context=None):
     #     """
     #    Deploy
@@ -97,15 +122,7 @@ class HeavenlyCloudsShellDriver (ResourceDriverInterface):
     #    """
     #
     #     # parse the json strings into action objects
-    #
-    #     self.logger.error('request')
-    #     self.logger.error(request)
     #     actions = self.request_parser.convert_driver_request_to_actions(request)
-    #
-    #     actions_json = json.dumps(actions, default=lambda o: o.__dict__,sort_keys=True,separators=(',',':'))
-    #
-    #     self.logger.error('actions_json')
-    #     self.logger.error(actions_json)
     #
     #     # extract DeployApp action
     #     deploy_action = single(actions, lambda x: isinstance(x, DeployApp))
@@ -114,45 +131,11 @@ class HeavenlyCloudsShellDriver (ResourceDriverInterface):
     #     # to decide which deployment option to use.
     #     deployment_name = deploy_action.actionParams.deployment.deploymentPath
     #
-    #     self.logger.error('deployment_name ')
-    #     self.logger.error(deployment_name )
-    #
     #     _my_deploy_method = self.deployments[deployment_name]
     #     deploy_result = _my_deploy_method(deploy_action, cancellation_context, self.logger)
     #
-    #     deploy_result_json = json.dumps(actions, default=lambda o: o.__dict__,
-    #                               sort_keys=True, indent=4)
-    #
-    #     self.logger.error('deploy_result_json')
-    #     self.logger.error(deploy_result_json)
-    #
     #     return DriverResponse([deploy_result]).to_driver_response_json()
-    def Deploy(self, context, request=None, cancellation_context=None):
-        """
-       Deploy
-       :param ResourceCommandContext context:
-       :param str request: A JSON string with the list of requested deployment actions
-       :param CancellationContext cancellation_context:
-       :return:
-       :rtype: str
-       """
-
-        # parse the json strings into action objects
-        actions = self.request_parser.convert_driver_request_to_actions(request)
-
-        # extract DeployApp action
-        deploy_action = single(actions, lambda x: isinstance(x, DeployApp))
-
-        # if we have multiple supported deployment options use the 'deploymentPath' property
-        # to decide which deployment option to use.
-        deployment_name = deploy_action.actionParams.deployment.deploymentPath
-
-        _my_deploy_method = self.deployments[deployment_name]
-        deploy_result = _my_deploy_method(deploy_action, cancellation_context, self.logger)
-
-        return DriverResponse([deploy_result]).to_driver_response_json()
-
-
+    #
 
     def PowerOn(self, context, ports):
         """
@@ -160,10 +143,17 @@ class HeavenlyCloudsShellDriver (ResourceDriverInterface):
         :param ResourceRemoteCommandContext context:
         :param ports:
         """
+        self._log_value('power_on_context', context)
+        self._log_value('power_on_ports', ports)
+        deployed_app_dict = json.loads(context.remote_endpoints[0].app_context.deployed_app_json)
+        cloud_provider_resource = HeavenlyCloudsShell.create_from_context(context)
+
+        HeavenlyCloudsServiceWrapper.power_on(cloud_provider_resource, deployed_app_dict['vmdetails']['uid'])
+
         pass
 
     def PowerOff(self, context, ports):
-        """
+        """+
         Will power off the compute resource
         :param ResourceRemoteCommandContext context:
         :param ports:
@@ -190,16 +180,16 @@ class HeavenlyCloudsShellDriver (ResourceDriverInterface):
         :return:
         """
 
-        self.logger.error(json.dumps(context, default=lambda o: o.__dict__,sort_keys=True, indent=4))
-        self.logger.error(requests)
+        self._log_value('GetVmDetails_context', context)
+        self._log_value('GetVmDetails_requests', requests)
 
-        result = HeavenlyCloudsServiceWrapper.get_vm_details(context, cancellation_context, requests)
-        result_json = json.dumps(result , default=lambda o: o.__dict__,sort_keys=True, indent=4)
+        cloud_provider_resource = HeavenlyCloudsShell.create_from_context(context)
+        result = HeavenlyCloudsServiceWrapper.get_vm_details(cloud_provider_resource, cancellation_context, requests)
+        result_json = json.dumps(result, default=lambda o: o.__dict__, sort_keys=True, separators=(',', ':'))
 
-        self.logger.error(result_json)
+        self._log_value('GetVmDetails_result', result_json)
 
         return result_json
-
 
     def remote_refresh_ip(self, context, ports, cancellation_context):
         """
@@ -211,9 +201,7 @@ class HeavenlyCloudsShellDriver (ResourceDriverInterface):
         """
         pass
 
-
     # </editor-fold>
-
 
     ### NOTE: According to the Connectivity Type of your shell, remove the commands that are not
     ###       relevant from this file and from drivermetadata.xml.
@@ -230,7 +218,7 @@ class HeavenlyCloudsShellDriver (ResourceDriverInterface):
         """
         pass
 
-    # </editor-fold> 
+    # </editor-fold>
 
     # <editor-fold desc="Mandatory Commands For L3 Connectivity Type">
 
@@ -246,9 +234,9 @@ class HeavenlyCloudsShellDriver (ResourceDriverInterface):
         '''
         # parse the json strings into action objects
         actions = self.request_parser.convert_driver_request_to_actions(request)
-        
+
         action_results = _my_prepare_connectivity(context, actions, cancellation_context)
-        
+
         return DriverResponse(action_results).to_driver_response_json()    
         '''
         pass
@@ -260,11 +248,10 @@ class HeavenlyCloudsShellDriver (ResourceDriverInterface):
         :param str request:
         :return:
         :rtype: str
-        """
-        '''
+        """        '''
         # parse the json strings into action objects
         actions = self.request_parser.convert_driver_request_to_actions(request)
-        
+
         action_results = _my_cleanup_connectivity(context, actions)
 
         return DriverResponse(action_results).to_driver_response_json()    
@@ -294,42 +281,22 @@ class HeavenlyCloudsShellDriver (ResourceDriverInterface):
         """
         pass
 
-    # def deploy_angel(self, deploy_app_action, cancellation_context,logger):
-    #
-    #     if isinstance(deploy_app_action,DeployApp):
-    #         pass
-    #
-    #     if cancellation_context.is_cancelled:
-    #         return DeployAppResult(actionId=deploy_app_action.actionId, success=False, errorMessage='Operation canceled')
-    #
-    #     deployment_model = deploy_app_action.actionParams.deployment.customModel
-    #
-    #     if isinstance(deployment_model, DeployAngelModel):
-    #         pass
-    #
-    #     logger.error('in HeavenlyCloudsServiceWrapper deploy_angel')
-    #
-    #     # do real stuff
-    #     #vm_instance = HeavenlyCloudsService.create_angel_instance(deploy_app_action.actionParams.appName,deployment_model.wings_count,deployment_model.flight_speed, deployment_model.cloud_name,deployment_model.cloud_color)
-    #     return HeavenlyCloudsServiceWrapper.deploy_angel(deploy_app_action,cancellation_context,logger)
+    # region helpers
 
+    def _log_value(self, name, obj):
 
-    # def deploy_man(self, deploy_app_action, cancellation_context, logger):
-    #
-    #     if isinstance(deploy_app_action,DeployApp):
-    #         pass
-    #
-    #     if cancellation_context.is_cancelled:
-    #         return DeployAppResult(actionId=deploy_app_action.actionId, success=False, errorMessage='Operation canceled')
-    #
-    #     deployment_model = deploy_app_action.actionParams.deployment.customModel
-    #
-    #     if isinstance(deployment_model, DeployAngelModel):
-    #         pass
-    #
-    #     logger.error('in HeavenlyCloudsServiceWrapper deploy_man')
-    #
-    #     # do real stuff
-    #     #m_instance = HeavenlyCloudsService.create_angel_instance(deploy_app_action.actionParams.appName,deployment_model.wings_count,deployment_model.flight_speed, deployment_model.cloud_name,deployment_model.cloud_color)
-    #     return HeavenlyCloudsServiceWrapper.deploy_man(deploy_app_action, cancellation_context, logger)
+        if not obj:
+            self.logger.info(name + 'Value  is None')
 
+        if not self._is_primitive(obj):
+            name = name + '__json_serialized'
+            obj = json.dumps(obj, default=lambda o: o.__dict__, sort_keys=True, separators=(',', ':'))
+
+        self.logger.info(name)
+        self.logger.info(obj)
+
+    def _is_primitive(self, thing):
+        primitive = (int, str, bool, float, unicode)
+        return isinstance(thing, primitive)
+
+    # endregion
