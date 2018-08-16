@@ -16,15 +16,18 @@ node_types:
  vendor.resource.HeavenlyCloudsShell:
     derived_from: cloudshell.nodes.CustomCloudProvider
     properties:
-      user:
+      User:
         type: string        
         description: user name
-      password:
+      Password:
         type: string        
         description: password
-      heaven_cloud_color:
+      Heaven cloud color:
         type: string
         description: color of a cloud
+      Default storage:
+        type: string
+        description: default storage
 
     capabilities:
       auto_discovery_capability:
@@ -38,16 +41,22 @@ node_types:
             default: Describe the auto discovery
           inventory_description:
             type: string
-            default: Describe the resource shell template
-          heaven_cloud_color:
+            default: Describe the resource shell template          
+          hide_address:
+            type: string
+            default: false
+          Heaven cloud color:
             type: string
             default: white          
-          user:
+          User:
             type: string
             default: no one
-          password:
+          Password:
             type: string
             default: 123456           
+          Region:
+            type: string
+            default: narnia
     artifacts:
       icon:
         file: heavenly-clouds-icon.png

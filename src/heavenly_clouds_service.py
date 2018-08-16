@@ -1,6 +1,9 @@
 from data_model import HeavenResidentInstance,Cloud
 import uuid
 
+
+
+# represents cloud SDK
 class HeavenlyCloudsService(object):
 
     @staticmethod
@@ -20,19 +23,31 @@ class HeavenlyCloudsService(object):
         pass
 
     @staticmethod
-    def power_on():
+    def power_on(cloud_provider_resource,vm_id):
         pass
 
     @staticmethod
-    def create_man_instance(name, height, weight ,cloud_name,cloud_color):
-        return HeavenResidentInstance(name, 'height {0} weight {1}'.format(height, weight ), Cloud(cloud_color, cloud_name, 0, 1),'8.8.4.4',str(uuid.uuid4()))
+    def create_new_password(instance):
+        return str(uuid.uuid4())
+
+    @staticmethod
+    def connect(user, password, address):
         pass
 
     @staticmethod
-    def create_angel_instance(name, wings_count, flight_speed, cloud_name, cloud_color):
-        return HeavenResidentInstance(name, 'wings count {0} flight speed {1}'.format(wings_count, flight_speed), Cloud(cloud_color, cloud_name, 0, 1),'8.8.8.8',str(uuid.uuid4()))
+    def create_man_instance(cloud_provider_resource, name, height, weight ,cloud_size, image):
+        HeavenlyCloudsService.connect(cloud_provider_resource.user, cloud_provider_resource.password, cloud_provider_resource.address)
+        return HeavenResidentInstance(name, 'height {0} weight {1}'.format(height, weight ),image, Cloud(cloud_size),str(uuid.uuid4()),'192.168.10.5','8.8.8.8')
+        pass
+
+    @staticmethod
+    def create_angel_instance(cloud_provider_resource, name, wings_count, flight_speed, cloud_size,image):
+        HeavenlyCloudsService.connect(cloud_provider_resource.user, cloud_provider_resource.password,
+                                      cloud_provider_resource.address)
+
+        return HeavenResidentInstance(name, 'wings count {0} flight speed {1}'.format(wings_count, flight_speed), image,Cloud(cloud_size),str(uuid.uuid4()),'192.168.0.5',None)
         pass
 
     @staticmethod
     def get_instance(cloud_provider_resource, name ,id,address):
-        return HeavenResidentInstance(name, 'instance {0} {1}'.format(name ,id), Cloud('', '', 0, 1),address,str(id))
+        return HeavenResidentInstance(name, 'instance {0} {1}'.format(name ,id),'centos', Cloud(0),str(id),address,None)
